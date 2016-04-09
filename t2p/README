@@ -1,0 +1,43 @@
+# kevin lenzo text-to-phone conversion
+# 
+# cf daelemons and von den bosch 97 in
+#    Advances in Speech Synthesis
+#    but with many changes, esp. incl alignment
+
+t2p_align.pl   takes in a dictionary and outputs the best
+               alignments it can make, i phone (or null) 
+               for each letter.     (.align)
+
+con2vec.pl     converts the alignments into oservation
+               vectors for training (.vec)
+
+t2p_id3.pl     builds the decision tree and writes the 
+               perl subroutine      (e.g. r1d7.pl)
+
+t2p_dt.pl      runs the text-to-phone engine once the
+               decision tree has been built.  starting
+               this with no args goes into interactive
+               mode; giving it a file, it expects that
+               file to be an aligned dictionary to
+               test against.
+
+The above should be runnable with perl 5.004 with a simple
+change of the #!/usr/bin/perl path to perl at the tops
+of the scripts.
+
+Included is also the cmu58k94.dic, its resultant alignments,
+the observation vectors generated from the alignments,
+in cmu58k94.dic, cmu58k94.dic.align, and cmu58k94.dic.vec
+respectively.
+
+r1d7.pl is the dtree from cmu58k94.dic, and t2p_dt.pl
+is currently set up to use it, so it should run out
+of the box.
+
+Results were 79% word/95% phone on cmu58k94.dic for
+full-depth tree.  Be wary of the code sizes of deep 
+trees.
+
+kevin
+lenzo@cs.cmu.edu
+12/10/97
