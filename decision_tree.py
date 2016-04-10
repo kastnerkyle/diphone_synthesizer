@@ -55,7 +55,7 @@ class node:
         self.false_node = false_node
 
 
-def build_tree(data, scoref=entropy):
+def build_tree(data, scoref=entropy, max_depth=20, depth=0):
     if len(data) == 0:
         return node()
     current_score = scoref(data)
@@ -83,16 +83,19 @@ def build_tree(data, scoref=entropy):
                 best_sets = (set1, set2)
 
     # Create the sub branches
+    current_depth = depth
     if best_gain > 0:
-        true_branch = build_tree(best_sets[0])
-        false_branch = build_tree(best_sets[1])
+        true_branch = build_tree(best_sets[0], scoref=scoref,
+                                 max_depth=max_depth, depth=current_depth + 1)
+        false_branch = build_tree(best_sets[1], scoref=scoref,
+                                  max_depth=max_depth, depth=current_depth + 1)
         return node(column=best_criteria[0], value=best_criteria[1],
                     true_node=true_branch, false_node=false_branch)
     else:
         return node(results=target_counts(data))
 
 
-def classify(observation, tree):
+def classify_tree(observation, tree):
     if tree.results is not None:
         return tree.results
     else:
@@ -108,7 +111,7 @@ def classify(observation, tree):
                 branch = tree.true_node
             else:
                 branch = tree.false_node
-        return classify(observation, branch)
+        return classify_tree(observation, branch)
 
 
 def print_tree(tree, indent=''):
@@ -116,11 +119,11 @@ def print_tree(tree, indent=''):
     if tree.results is not None:
         print(str(tree.results))
     else:
-        print(str(tree.column) + ':' + str(tree.value) + '? ')
+        print(str(tree.column) + ":" + str(tree.value) + "? ")
         # Print the branches
-        print(indent + 'T->', end=" ")
+        print(indent + "T->", end=" ")
         print_tree(tree.true_node, indent + "  ")
-        print(indent+'F->', end=" ")
+        print(indent + "F->", end=" ")
         print_tree(tree.false_node, indent + "  ")
 
 
@@ -164,5 +167,5 @@ if __name__ == "__main__":
     tree = build_tree(my_data)
     print_tree(tree)
 
-    print(classify(['(direct)', 'USA', 'yes', 5], tree))
-    print(classify(['(direct)', 'USA', 'no', 23], tree))
+    print(classify_tree(['(direct)', 'USA', 'yes', 5], tree))
+    print(classify_tree(['(direct)', 'USA', 'no', 23], tree))
