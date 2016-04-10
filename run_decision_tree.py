@@ -59,7 +59,7 @@ idx = idx[:num_samples]
 all_feats = [all_feats[i] for i in idx]
 tree = build_tree(all_feats)
 
-pred_text = "HELLO"
+pred_text = "INSTAGRAM"
 pred_phones = recursive_classify_tree(pred_text, tree)
 print(pred_text)
 print(pred_phones)
