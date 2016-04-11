@@ -4,6 +4,7 @@ import numpy as np
 import tarfile
 from scipy.io import wavfile
 import os
+import sys
 
 with open("cmudict.0.7a_SPHINX_40.align", mode="r") as f:
     lines = f.readlines()
@@ -258,9 +259,13 @@ if __name__ == "__main__":
 
     tree = load_tree_from_json(saved_filename)
 
-    pred_text = "HEISENBERG"
+    if len(sys.argv) > 1:
+        pred_text = str(sys.argv[1]).upper()
+    else:
+        pred_text = "HEISENBERG"
     pred_phones = recursive_classify_tree(pred_text, tree)
-    print(pred_text, pred_phones)
+    print("Text:", pred_text)
+    print("Predicted phones:", pred_phones)
 
     fs, wav = synthesize(pred_phones)
     wavfile.write("out.wav", fs, soundsc(wav))
