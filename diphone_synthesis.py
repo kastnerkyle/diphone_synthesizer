@@ -142,6 +142,7 @@ def synthesize(phones):
         elif p1 != "_" and p2 == "_":
             # continuation phone, use real one to form p1-p1
             # edge case - try 3 p1_p3 combo here, but always move +1
+            # still
             p1 = cmu2radio[p1]
             r = real_match(p1, p1)
             if len(r) > 1:
