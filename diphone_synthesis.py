@@ -3,6 +3,7 @@ from decision_tree import dump_tree_to_json, load_tree_from_json
 import numpy as np
 import tarfile
 from scipy.io import wavfile
+import struct
 import os
 import sys
 
@@ -114,71 +115,53 @@ def real_match(in1, in2):
     if len(r) < 1:
         # This really shouldn't happen, but handle edge cases
         print("No match found?")
-        if in1 == "y" and in2 == "er":
-            print("replacing ['y', 'er'] with ['ey', 'r']")
-            in1 = "ey"
-            in2 = "r"
-            r = [(n, m) for n, m in enumerate(all_real)
-                 if m == [in1, in2]]
-            return r
-        else:
-            print(in1, in2)
-            raise ValueError()
+        print(in1, in2)
     return r
 
 
 def synthesize(phones):
+    phones = phones
     diphone_results = []
     n = 0
     max_n = len(phones) - 1
     # Find phone pair and see if it matches database
     while True:
-        if n == max_n:
+        if n >= max_n:
             break
         p1 = phones[n]
         p2 = phones[n + 1]
-        if p1 == "_" or p2 == "_":
-            # make fake diphone and check if we have it
-            blank1 = 0
-            if p1 != "_":
-                blank1 = 0
-                blank2 = 1
-                p1 = cmu2radio[p1]
-            elif p2 != "_":
-                blank1 = 1
-                blank2 = 0
-                p2 = cmu2radio[p2]
-            else:
-                # Edge case with double blank
-                n += 1
-                continue
-            px1 = [p1, p2]
-            p3 = phones[n + 2]
-            p3 = cmu2radio[p3]
-            px2 = [p2, p3]
-            # Only 1 should match if any
-            r = [(n, m) for n, m in enumerate(all_fake)
-                 if m == [p1, p2, p3]]
-            if len(r) < 1:
-                # go to real diphone case
-                px2 = [p2, p2]
-                if p2 == "_":
-                    # Edge case with last char "_"
-                    break
-                r = real_match(px1[blank1], px2[blank2])
+        if p1 == "_" and p2 != "_":
+            # continuation phone, use real one to form p2-p2
+            p2 = cmu2radio[p2]
+            r = real_match(p2, p2)
+            r = r[0]
+            idx = r[0]
+            match = r[1]
+            diph_idx = all_real_idx[idx]
+            diphone_results.append(kal_diph[diph_idx])
+        elif p1 != "_" and p2 == "_":
+            # continuation phone, use real one to form p1-p1
+            # edge case - try 3 p1_p3 combo here, but always move +1
+            p1 = cmu2radio[p1]
+            r = real_match(p1, p1)
+            if len(r) > 1:
                 r = r[0]
                 idx = r[0]
                 match = r[1]
                 diph_idx = all_real_idx[idx]
-            else:
-                # fake diphone exists, find lookup
+                diphone_results.append(kal_diph[diph_idx])
+            # if no match just skip onwards
+        elif p1 == "_" and p2 == "_":
+            # two continuations, nothing to do
+            r = real_match("pau", "pau")
+            if len(r) > 1:
                 r = r[0]
                 idx = r[0]
                 match = r[1]
-                diph_idx = all_fake_idx[idx]
-            n += 2
+                diph_idx = all_real_idx[idx]
+                diphone_results.append(kal_diph[diph_idx])
         else:
-            # make real diphone and look it up
+            # two real phones
             p1 = cmu2radio[p1]
             p2 = cmu2radio[p2]
             r = real_match(p1, p2)
@@ -186,8 +169,8 @@ def synthesize(phones):
             idx = r[0]
             match = r[1]
             diph_idx = all_real_idx[idx]
-            n += 1
-        diphone_results.append(kal_diph[diph_idx])
+            diphone_results.append(kal_diph[diph_idx])
+        n += 1
     fs, wav = stitch_diphones(diphone_results)
     return fs, wav
 
@@ -257,14 +240,17 @@ def soundsc(X, copy=True):
     Returns
     -------
     X_sc : ndarray
-        (-65535, 65535) scaled version of X as int16, suitable for writing
+        (-32767, 32767) scaled version of X as int16, suitable for writing
         with scipy.io.wavfile
     """
     X = np.array(X, copy=copy)
+    X = X - X.mean()
     X = (X - X.min()) / (X.max() - X.min())
     X = .9 * X
     X = 2 * X - 1
-    return ((2 ** 15) * X).astype('int16')
+    X = ((2 ** 15) - 1) * X
+    X = X.astype("int16")
+    return X
 
 
 if __name__ == "__main__":
@@ -302,4 +288,11 @@ if __name__ == "__main__":
         fs, wav = synthesize(pred_phones)
         all_wav.append(wav)
     full_wav = np.concatenate(all_wav)
-    wavfile.write("out.wav", fs, soundsc(full_wav))
+    try:
+        wavfile.write("out.wav", fs, soundsc(full_wav))
+    except struct.error:
+        print("Something bizarre has happened! Try a different phrasing.")
+        print("e.g.")
+        print("python diphone_synthesis.py born in the ewe ess aye")
+        print("can become")
+        print("python diphone_synthesis.py born in the ewe ess ay")
