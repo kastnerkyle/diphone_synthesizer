@@ -107,6 +107,26 @@ def recursive_classify_tree(text, tree, char_win=CHAR_WIN):
     return pred_phones
 
 
+def real_match(in1, in2):
+    # No fake for this pair - skip blank and do real
+    r = [(n, m) for n, m in enumerate(all_real)
+         if m == [in1, in2]]
+    if len(r) < 1:
+        # This really shouldn't happen, but handle edge cases
+        print("No match found?")
+        if in1 == "y" and in2 == "er":
+            print("replacing ['y', 'er'] with ['ey', 'r']")
+            in1 = "ey"
+            in2 = "r"
+            r = [(n, m) for n, m in enumerate(all_real)
+                 if m == [in1, in2]]
+            return r
+        else:
+            print(in1, in2)
+            raise ValueError()
+    return r
+
+
 def synthesize(phones):
     diphone_results = []
     n = 0
@@ -124,34 +144,28 @@ def synthesize(phones):
                 blank1 = 0
                 blank2 = 1
                 p1 = cmu2radio[p1]
-            if p2 != "_":
+            elif p2 != "_":
                 blank1 = 1
                 blank2 = 0
                 p2 = cmu2radio[p2]
+            else:
+                # Edge case with double blank
+                n += 1
+                continue
             px1 = [p1, p2]
-            try:
-                p3 = phones[n + 2]
-                p3 = cmu2radio[p3]
-                px2 = [p2, p3]
-                # Only 1 should match if any
-                r = [(n, m) for n, m in enumerate(all_fake)
-                    if m == [p1, p2, p3]]
-            except IndexError:
-                # go to real diphonhe case
-                r = []
+            p3 = phones[n + 2]
+            p3 = cmu2radio[p3]
+            px2 = [p2, p3]
+            # Only 1 should match if any
+            r = [(n, m) for n, m in enumerate(all_fake)
+                 if m == [p1, p2, p3]]
+            if len(r) < 1:
+                # go to real diphone case
                 px2 = [p2, p2]
                 if p2 == "_":
-                    # Edge case with las char "_"
+                    # Edge case with last char "_"
                     break
-            if len(r) < 1:
-                # No fake for this pair - skip blank and do real
-                r = [(n, m) for n, m in enumerate(all_real)
-                     if m == [px1[blank1], px2[blank2]]]
-                if len(r) < 1:
-                    # This shouldn't happen
-                    print("No match found?")
-                    print(px1[blank1], px2[blank2])
-                    raise ValueError()
+                r = real_match(px1[blank1], px2[blank2])
                 r = r[0]
                 idx = r[0]
                 match = r[1]
@@ -167,18 +181,11 @@ def synthesize(phones):
             # make real diphone and look it up
             p1 = cmu2radio[p1]
             p2 = cmu2radio[p2]
-            r = [(n, m) for n, m in enumerate(all_real) if m == [p1, p2]]
-            if len(r) < 1:
-                # This shouldn't happen
-                print("No match found?")
-                print(p1, p2)
-                raise ValueError()
-            else:
-                # lookup real diphone
-                r = r[0]
-                idx = r[0]
-                match = r[1]
-                diph_idx = all_real_idx[idx]
+            r = real_match(p1, p2)
+            r = r[0]
+            idx = r[0]
+            match = r[1]
+            diph_idx = all_real_idx[idx]
             n += 1
         diphone_results.append(kal_diph[diph_idx])
     fs, wav = stitch_diphones(diphone_results)
@@ -250,14 +257,14 @@ def soundsc(X, copy=True):
     Returns
     -------
     X_sc : ndarray
-        (-1, 1) scaled version of X as float32, suitable for writing
+        (-65535, 65535) scaled version of X as int16, suitable for writing
         with scipy.io.wavfile
     """
     X = np.array(X, copy=copy)
     X = (X - X.min()) / (X.max() - X.min())
     X = .9 * X
     X = 2 * X - 1
-    return X.astype('float32')
+    return ((2 ** 15) * X).astype('int16')
 
 
 if __name__ == "__main__":
@@ -273,7 +280,7 @@ if __name__ == "__main__":
         random_state = np.random.RandomState(1999)
         random_state.shuffle(idx)
         # Out of 900k samples... but scaling is poor
-        num_samples = 10000
+        num_samples = 1000
         idx = idx[:num_samples]
         all_feats = [all_feats[i] for i in idx]
         # Let max leaves be > number of phones (44)
