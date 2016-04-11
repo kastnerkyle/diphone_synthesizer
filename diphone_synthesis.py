@@ -73,10 +73,11 @@ def make_features(text, phones, char_win=CHAR_WIN):
     ext_text = pad_str + text + pad_str
     ext_phone = [pad_phone] + phones
     slice_text = [ext_text[i:i + char_win] for i in range(len(text))]
+    # Only create features that match common subset of cmu and radio phones
     feats = [[ext_phone[i]] + list(slice_text[i]) + [ext_phone[i + 1]]
              for i in range(len(slice_text))
-             if (ext_phone[i] in phoneset_cmu)
-             and (ext_phone[i + 1] in phoneset_cmu)]
+             if (ext_phone[i] in phoneset_cmu + ["_"])
+             and (ext_phone[i + 1] in phoneset_cmu + ["_"])]
     return feats
 
 
@@ -262,12 +263,16 @@ if __name__ == "__main__":
     tree = load_tree_from_json(saved_filename)
 
     if len(sys.argv) > 1:
-        pred_text = str(sys.argv[1]).upper()
+        pred_text = list(sys.argv[1:])
+        pred_text = [t.upper() for t in pred_text]
     else:
-        pred_text = "HEISENBERG"
-    pred_phones = recursive_classify_tree(pred_text, tree)
-    print("Text:", pred_text)
-    print("Predicted phones:", pred_phones)
-
-    fs, wav = synthesize(pred_phones)
-    wavfile.write("out.wav", fs, soundsc(wav))
+        pred_text = ["HEISENBERG"]
+    all_wav = []
+    for pt in pred_text:
+        pred_phones = recursive_classify_tree(pt, tree)
+        print("Text:", pt)
+        print("Predicted phones:", pred_phones)
+        fs, wav = synthesize(pred_phones)
+        all_wav.append(wav)
+    full_wav = np.concatenate(all_wav)
+    wavfile.write("out.wav", fs, soundsc(full_wav))
