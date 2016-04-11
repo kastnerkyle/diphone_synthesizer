@@ -74,7 +74,9 @@ def make_features(text, phones, char_win=CHAR_WIN):
     ext_phone = [pad_phone] + phones
     slice_text = [ext_text[i:i + char_win] for i in range(len(text))]
     feats = [[ext_phone[i]] + list(slice_text[i]) + [ext_phone[i + 1]]
-             for i in range(len(slice_text))]
+             for i in range(len(slice_text))
+             if (ext_phone[i] in phoneset_cmu)
+             and (ext_phone[i + 1] in phoneset_cmu)]
     return feats
 
 
