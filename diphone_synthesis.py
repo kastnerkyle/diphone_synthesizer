@@ -119,21 +119,38 @@ def synthesize(phones):
         p2 = phones[n + 1]
         if p1 == "_" or p2 == "_":
             # make fake diphone and check if we have it
+            blank1 = 0
             if p1 != "_":
+                blank1 = 0
+                blank2 = 1
                 p1 = cmu2radio[p1]
             if p2 != "_":
+                blank1 = 1
+                blank2 = 0
                 p2 = cmu2radio[p2]
-            p3 = phones[n + 2]
-            p3 = cmu2radio[p3]
-            # Only 1 should match if any
-            r = [(n, m) for n, m in enumerate(all_fake)
-                 if m == [p1, p2, p3]]
+            px1 = [p1, p2]
+            try:
+                p3 = phones[n + 2]
+                p3 = cmu2radio[p3]
+                px2 = [p2, p3]
+                # Only 1 should match if any
+                r = [(n, m) for n, m in enumerate(all_fake)
+                    if m == [p1, p2, p3]]
+            except IndexError:
+                # go to real diphonhe case
+                r = []
+                px2 = [p2, p2]
+                if p2 == "_":
+                    # Edge case with las char "_"
+                    break
             if len(r) < 1:
                 # No fake for this pair - skip blank and do real
-                r = [(n, m) for n, m in enumerate(all_real) if m == [p1, p3]]
+                r = [(n, m) for n, m in enumerate(all_real)
+                     if m == [px1[blank1], px2[blank2]]]
                 if len(r) < 1:
                     # This shouldn't happen
                     print("No match found?")
+                    print(px1[blank1], px2[blank2])
                     raise ValueError()
                 r = r[0]
                 idx = r[0]
@@ -154,6 +171,7 @@ def synthesize(phones):
             if len(r) < 1:
                 # This shouldn't happen
                 print("No match found?")
+                print(p1, p2)
                 raise ValueError()
             else:
                 # lookup real diphone
@@ -197,6 +215,8 @@ def stitch_diphones(diphones_info):
     # Dumb, fast overlap add
     result = np.zeros((sample_total), dtype="float32")
     idx = 0
+    # Edge case single phone
+    iend = sample_total
     for n, (wav, mid) in enumerate(zip(wavs, mids)):
         istart = idx
         imid = idx + mid
