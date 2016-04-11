@@ -3,6 +3,9 @@ import pprint
 from collections import Counter
 import numpy as np
 from functools import reduce
+import json
+import base64
+import pickle
 
 
 def column_split(data, column, value):
@@ -59,6 +62,9 @@ def build_tree(data, scoref=entropy, max_depth=20, depth=0):
     if len(data) == 0:
         return node()
     current_score = scoref(data)
+    # Hit maximum depth, time to bail
+    if depth > max_depth:
+        return node(results=target_counts(data))
 
     best_gain = 0.0
     best_criteria = None
@@ -83,12 +89,11 @@ def build_tree(data, scoref=entropy, max_depth=20, depth=0):
                 best_sets = (set1, set2)
 
     # Create the sub branches
-    current_depth = depth
     if best_gain > 0:
         true_branch = build_tree(best_sets[0], scoref=scoref,
-                                 max_depth=max_depth, depth=current_depth + 1)
+                                 max_depth=max_depth, depth=depth + 1)
         false_branch = build_tree(best_sets[1], scoref=scoref,
-                                  max_depth=max_depth, depth=current_depth + 1)
+                                  max_depth=max_depth, depth=depth + 1)
         return node(column=best_criteria[0], value=best_criteria[1],
                     true_node=true_branch, false_node=false_branch)
     else:
@@ -125,6 +130,37 @@ def print_tree(tree, indent=''):
         print_tree(tree.true_node, indent + "  ")
         print(indent + "F->", end=" ")
         print_tree(tree.false_node, indent + "  ")
+
+
+class PythonObjectEncoder(json.JSONEncoder):
+    """
+    http://stackoverflow.com/questions/23595801/how-do-i-serialize-a-tree-class-object-structure-with-python-json
+    """
+    def default(self, obj):
+        return {'_python_object':
+                base64.b64encode(pickle.dumps(obj)).decode('utf-8')}
+
+
+def as_python_object(dct):
+    """
+    Remember kids, don't unpickle something you don't trust
+    """
+    if '_python_object' in dct:
+        return pickle.loads(base64.b64decode(dct['_python_object']))
+    return dct
+
+
+def dump_tree_to_json(tree, filename):
+    serialized_tree = json.dumps(tree, cls=PythonObjectEncoder, indent=4)
+    with open(filename, mode="w") as f:
+        f.write(serialized_tree)
+
+
+def load_tree_from_json(filename):
+    with open(filename, mode="r") as f:
+        serialized_tree = f.read()
+    tree = json.loads(serialized_tree, object_hook=as_python_object)
+    return tree
 
 
 if __name__ == "__main__":
