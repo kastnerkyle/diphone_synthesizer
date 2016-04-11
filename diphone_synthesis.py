@@ -1,6 +1,8 @@
 from decision_tree import print_tree, classify_tree, build_tree
 from decision_tree import dump_tree_to_json, load_tree_from_json
 import numpy as np
+import tarfile
+from scipy.io import wavfile
 import os
 
 with open("cmudict.0.7a_SPHINX_40.align", mode="r") as f:
@@ -157,39 +159,108 @@ def synthesize(phones):
                 diph_idx = all_real_idx[idx]
             n += 1
         diphone_results.append(kal_diph[diph_idx])
-    wav = stitch_diphones(diphone_results)
-    return wav
+    fs, wav = stitch_diphones(diphone_results)
+    return fs, wav
 
 
 def stitch_diphones(diphones_info):
-    from IPython import embed; embed()
-    raise ValueError()
+    # first iterate to get overall time
+    # all times in milliseconds
+    tar = tarfile.open("wav.tar.gz")
+    sample_total = 0
+    mids = []
+    wavs = []
+    fs = -1
+    for diphone in diphones_info:
+        filename, time_start, time_mid, time_end = diphone[1:]
+        time_start = float(time_start)
+        time_mid = float(time_mid)
+        time_end = float(time_end)
+
+        filename = filename + ".wav"
+        which = diphone[0]
+        to_fetch = "wav/" + filename
+        wf = tar.extractfile(to_fetch)
+        fs, d = wavfile.read(wf)
+
+        sample_start = int(time_start * fs)
+        sample_end = int(time_end * fs)
+        sample_mid = int(time_mid * fs)
+        sample_total += sample_end - sample_start
+        mids.append(sample_mid - sample_start)
+        wavs.append(d[sample_start:sample_end])
+
+    # Dumb, fast overlap add
+    result = np.zeros((sample_total), dtype="float32")
+    idx = 0
+    for n, (wav, mid) in enumerate(zip(wavs, mids)):
+        istart = idx
+        imid = idx + mid
+        iend = idx + len(wav)
+        win = np.hanning(len(wav))
+        windowed = win * wav
+        if n == 0:
+            # Don't window very first
+            windowed[:mid] = wav[:mid]
+        elif n == (len(mids) - 1):
+            # Don't window very last
+            windowed[mid:] = wav[mid:]
+        result[istart:iend] += windowed / float(2 ** 15.)
+        idx = imid
+    result = result[:iend + 8000]
+    return fs, result
 
 
-saved_filename = "saved_decision_tree.json"
-if not os.path.exists(saved_filename):
-    # If we don't have a saved tree, save it
-    all_feats = []
-    for i in range(len(text)):
-        feat = make_features(text[i], phones[i])
-        all_feats.extend(feat)
-    idx = list(range(len(all_feats)))
+def soundsc(X, copy=True):
+    """
+    Approximate implementation of soundsc from MATLAB without the audio playing.
 
-    random_state = np.random.RandomState(1999)
-    random_state.shuffle(idx)
-    # Out of 900k samples... but scaling is poor
-    num_samples = 10000
-    idx = idx[:num_samples]
-    all_feats = [all_feats[i] for i in idx]
-    # Let max leaves be > number of phones (44)
-    tree = build_tree(all_feats, max_depth=50)
-    dump_tree_to_json(tree, saved_filename)
+    Parameters
+    ----------
+    X : ndarray
+        Signal to be rescaled
 
-tree = load_tree_from_json(saved_filename)
+    copy : bool, optional (default=True)
+        Whether to make a copy of input signal or operate in place.
 
-pred_text = "BOOTYLICIOUS"
-pred_phones = recursive_classify_tree(pred_text, tree)
-print(pred_text, pred_phones)
+    Returns
+    -------
+    X_sc : ndarray
+        (-1, 1) scaled version of X as float32, suitable for writing
+        with scipy.io.wavfile
+    """
+    X = np.array(X, copy=copy)
+    X = (X - X.min()) / (X.max() - X.min())
+    X = .9 * X
+    X = 2 * X - 1
+    return X.astype('float32')
 
-synthesize(pred_phones)
-from IPython import embed; embed()
+
+if __name__ == "__main__":
+    saved_filename = "saved_decision_tree.json"
+    if not os.path.exists(saved_filename):
+        # If we don't have a saved tree, save it
+        all_feats = []
+        for i in range(len(text)):
+            feat = make_features(text[i], phones[i])
+            all_feats.extend(feat)
+        idx = list(range(len(all_feats)))
+
+        random_state = np.random.RandomState(1999)
+        random_state.shuffle(idx)
+        # Out of 900k samples... but scaling is poor
+        num_samples = 10000
+        idx = idx[:num_samples]
+        all_feats = [all_feats[i] for i in idx]
+        # Let max leaves be > number of phones (44)
+        tree = build_tree(all_feats, max_depth=50)
+        dump_tree_to_json(tree, saved_filename)
+
+    tree = load_tree_from_json(saved_filename)
+
+    pred_text = "HEISENBERG"
+    pred_phones = recursive_classify_tree(pred_text, tree)
+    print(pred_text, pred_phones)
+
+    fs, wav = synthesize(pred_phones)
+    wavfile.write("out.wav", fs, soundsc(wav))
