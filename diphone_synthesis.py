@@ -295,6 +295,13 @@ if __name__ == "__main__":
         pred_text = ["HEISENBERG"]
     all_wav = []
     for pt in pred_text:
+        # quality of life hacks for simple words
+        if pt == "I":
+            print("Replacing I -> EYE")
+            pt = "EYE"
+        elif pt == "YOU":
+            print("Replacing YOU -> EWE")
+            pt = "EWE"
         pred_phones = recursive_classify_tree(pt, tree)
         print("Text:", pt)
         print("Predicted phones:", pred_phones)
