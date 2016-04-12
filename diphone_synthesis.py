@@ -120,7 +120,8 @@ def real_match(in1, in2):
 
 
 def synthesize(phones):
-    phones = phones
+    # hack: add first and last phone as a repetition to get less clipped sound
+    phones = [phones[0]] + phones + [phones[-1]]
     diphone_results = []
     n = 0
     max_n = len(phones) - 1
@@ -140,12 +141,21 @@ def synthesize(phones):
             diph_idx = all_real_idx[idx]
             diphone_results.append(kal_diph[diph_idx])
         elif p1 != "_" and p2 == "_":
-            # continuation phone, use real one to form p1-p1
-            # edge case - try 3 p1_p3 combo here, but always move +1
-            # still
             p1 = cmu2radio[p1]
-            r = real_match(p1, p1)
-            if len(r) > 1:
+            triple_found = False
+            if n + 2 <= max_n:
+                # try 3 p1_p3 combo here, but always move +1
+                p3 = phones[n + 2]
+                if p3 != "_":
+                    p3 = cmu2radio[p3]
+                    r = [(n, m) for n, m in enumerate(all_fake) if
+                        m == [p1, p2, p3]]
+                    if len(r) > 0:
+                        triple_found = True
+            # continuation phone, use real one to form p1-p1
+            if not triple_found:
+                r = real_match(p1, p1)
+            if len(r) > 0:
                 r = r[0]
                 idx = r[0]
                 match = r[1]
@@ -155,7 +165,7 @@ def synthesize(phones):
         elif p1 == "_" and p2 == "_":
             # two continuations, nothing to do
             r = real_match("pau", "pau")
-            if len(r) > 1:
+            if len(r) > 0:
                 r = r[0]
                 idx = r[0]
                 match = r[1]
@@ -166,11 +176,13 @@ def synthesize(phones):
             p1 = cmu2radio[p1]
             p2 = cmu2radio[p2]
             r = real_match(p1, p2)
-            r = r[0]
-            idx = r[0]
-            match = r[1]
-            diph_idx = all_real_idx[idx]
-            diphone_results.append(kal_diph[diph_idx])
+            if len(r) > 0:
+                r = r[0]
+                idx = r[0]
+                match = r[1]
+                diph_idx = all_real_idx[idx]
+                diphone_results.append(kal_diph[diph_idx])
+            # if no match found skip on
         n += 1
     fs, wav = stitch_diphones(diphone_results)
     return fs, wav
@@ -222,7 +234,7 @@ def stitch_diphones(diphones_info):
             windowed[mid:] = wav[mid:]
         result[istart:iend] += windowed / float(2 ** 15.)
         idx = imid
-    result = result[:iend + 8000]
+    result = np.concatenate((result[:iend], np.zeros((4000,), dtype="float32")))
     return fs, result
 
 
@@ -267,7 +279,7 @@ if __name__ == "__main__":
         random_state = np.random.RandomState(1999)
         random_state.shuffle(idx)
         # Out of 900k samples... but scaling is poor
-        num_samples = 1000
+        num_samples = 10000
         idx = idx[:num_samples]
         all_feats = [all_feats[i] for i in idx]
         # Let max leaves be > number of phones (44)
