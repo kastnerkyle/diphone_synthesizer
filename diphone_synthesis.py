@@ -302,6 +302,15 @@ if __name__ == "__main__":
         elif pt == "YOU":
             print("Replacing YOU -> EWE")
             pt = "EWE"
+        elif pt == "THE":
+            print("Replacing THE -> THEEE")
+            pt = "THEEE"
+        elif pt == "ME":
+            print("Replacing ME -> MEEE")
+            pt = "MEEE"
+        elif pt == "WHAT":
+            print("Replacing WHAT -> WUT")
+            pt = "HWAT"
         pred_phones = recursive_classify_tree(pt, tree)
         print("Text:", pt)
         print("Predicted phones:", pred_phones)
