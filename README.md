@@ -19,6 +19,8 @@ and processed with t2p/t2p_align.pl cmudict.0.7a_SPHINX_40 > cmudict.0.7a_SPHINX
 
 Core wav files in wav.tar.gz gotten from http://festvox.org/databases/cmu_us_kal_diphone/packed/cmu_us_kal_diphone_base.tar.bz2
 
+kaldiph.est also taken from cmu_us_kal_diphone_base.tar.bz2
+
 Alignment methodology is described in
 http://arxiv.org/pdf/cmp-lg/9808010v1.pdf
 https://www.cs.cmu.edu/~awb/papers/ESCA98_lts.pdf
