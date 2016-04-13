@@ -127,6 +127,7 @@ def synthesize(phones):
     max_n = len(phones) - 1
     # Find phone pair and see if it matches database
     while True:
+        skip = 1
         if n >= max_n:
             break
         p1 = phones[n]
@@ -135,11 +136,12 @@ def synthesize(phones):
             # continuation phone, use real one to form p2-p2
             p2 = cmu2radio[p2]
             r = real_match(p2, p2)
-            r = r[0]
-            idx = r[0]
-            match = r[1]
-            diph_idx = all_real_idx[idx]
-            diphone_results.append(kal_diph[diph_idx])
+            if len(r) > 0:
+                r = r[0]
+                idx = r[0]
+                match = r[1]
+                diph_idx = all_real_idx[idx]
+                diphone_results.append(kal_diph[diph_idx])
         elif p1 != "_" and p2 == "_":
             p1 = cmu2radio[p1]
             triple_found = False
@@ -183,7 +185,7 @@ def synthesize(phones):
                 diph_idx = all_real_idx[idx]
                 diphone_results.append(kal_diph[diph_idx])
             # if no match found skip on
-        n += 1
+        n += skip
     fs, wav = stitch_diphones(diphone_results)
     return fs, wav
 
@@ -234,7 +236,7 @@ def stitch_diphones(diphones_info):
             windowed[mid:] = wav[mid:]
         result[istart:iend] += windowed / float(2 ** 15.)
         idx = imid
-    result = np.concatenate((result[:iend], np.zeros((4000,), dtype="float32")))
+    result = np.concatenate((result[:iend], np.zeros((200,), dtype="float32")))
     return fs, result
 
 
