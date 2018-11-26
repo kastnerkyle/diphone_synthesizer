@@ -1,6 +1,8 @@
 # Unit Selection Diphone Synthesizer 
 A tutorial diphone synthesizer in Python
 
+http://kastnerkyle.github.io/posts/bad-speech-synthesis-made-simple/
+
 # Usage Example
 python diphone_synthesis.py <word>
 
